@@ -3,84 +3,40 @@ package main
 import (
 	"bufio"
 	"encoding/json"
-	"fmt"
+	"log"
 	"os"
 )
 
-// The input json is an array with 2 items.
-// The first item is configuration, parameters to the preprocessor and other stuff
-// The second item is the "content" of the book, the part that should be exported
-// This is strange, why in same array?
-type MdBookTopItem struct {
-	Root          string          `json:"root,omitempty"`
-	Config        *MdBookConfig   `json:"config,omitempty"`
-	Renderer      string          `json:"renderer,omitempty"`
-	MdBookVersion string          `json:"mdbook_version,omitempty"`
-	Sections      []MdBookSection `json:"sections,omitempty"`
-	NonExhaustive *string         `json:"__non_exhaustive"`
-}
-
-type MdBookConfig struct {
-	Book         MdBookConfigBook         `json:"book"`
-	Build        MdBookConfigBuild        `json:"build"`
-	Output       MdBookConfigOutput       `json:"output"`
-	Preprocessor MdBookConfigPreprocessor `json:"preprocessor"`
-}
-
-type MdBookConfigBook struct {
-	Authors      []string `json:"authors"`
-	Language     string   `json:"language"`
-	Multilingual bool     `json:"multilingual"`
-	Src          string   `json:"src"`
-	Title        string   `json:"title"`
-}
-
-type MdBookConfigBuild struct {
-	BuildDir                string   `json:"build-dir"`
-	CreateMissing           bool     `json:"create-missing"`
-	ExtraWatchDirs          []string `json:"extra-watch-dirs"`
-	UseDefaultPreprocessors bool     `json:"use-default-preprocessors"`
-}
-
-type MdBookConfigOutput struct {
-	Html MdBookConfigOutputHtml `json:"html"`
-}
-
-type MdBookConfigOutputHtml struct {
-	AdditionalCss []string `json:"additional-css"`
-}
-
-type MdBookConfigPreprocessor struct {
-	Example *MdBookConfigPreprocessorX `json:"example,omitempty"`
-	Trams   *MdBookConfigPreprocessorX `json:"trams,omitempty"`
-}
-
-type MdBookConfigPreprocessorX struct {
-	Before   []string `json:"before,omitempty"`
-	After    []string `json:"after,omitempty"`
-	Command  string   `json:"command"`
-	Renderer []string `json:"renderer,omitempty"`
-}
-
-type MdBookSection struct {
-	Chapter MdBookChapter `json:"Chapter"`
-}
-
-type MdBookChapter struct {
-	Name        string          `json:"name"`
-	Content     string          `json:"content"`
-	Number      []int           `json:"number"`
-	SubItems    []MdBookSection `json:"sub_items"`
-	Path        string          `json:"path"`
-	SourcePath  string          `json:"source_path"`
-	ParentNames []string        `json:"parent_names"`
-}
-
 func check(e error) {
 	if e != nil {
-		fmt.Printf("Error: (%v)\n", e)
+		log.Printf("Error: (%v)\n", e)
 		panic(e)
 	}
+}
+
+func CreateTextFile(filetPath string, content string) {
+	f, err := os.Create(filetPath)
+	check(err)
+
+	n, err := f.WriteString(content + "\n")
+	check(err)
+	if n < 0 {
+		panic("tRAMS")
+	}
+	f.Sync()
+}
+
+func ReadTextFile(path string) string {
+	result := ""
+	f, _ := os.Open(path)
+	// Create a new Scanner for the file.
+	scanner := bufio.NewScanner(f)
+	// Loop over all lines in the file and print them.
+	for scanner.Scan() {
+		result += scanner.Text()
+	}
+
+	return result
 }
 
 func readFileLinesFile(filePath string) []string {
@@ -112,38 +68,15 @@ func readTextFile(filePath string) string {
 	return text
 }
 
-func writeBookSectionsToFile(bookSections MdBookTopItem, filename string) {
-	jsonData, err := json.MarshalIndent(bookSections, "", "    ")
-	check(err)
-	f, err := os.Create(filename)
-	check(err)
-	f.Write(jsonData)
-}
-
-func writeBookSectionsStdOut(bookSections MdBookTopItem) {
-	jsonData, err := json.Marshal(bookSections)
-	check(err)
-	fmt.Println(string(jsonData))
-}
-
-func readJsonFromStdIn() string {
-	f, err := os.Create("/tmp/kurt_in.json")
-	check(err)
-	tempWriter := bufio.NewWriter(f)
-
-	scanner := bufio.NewScanner(os.Stdin)
-	jsonText := ""
-	for scanner.Scan() {
-		jsonText += scanner.Text() + "\n"
-		_, err := tempWriter.WriteString(scanner.Text() + "\n")
-		check(err)
-	}
-
-	tempWriter.Flush()
-	return jsonText
-}
-
 func main() {
+	const logFileName = "/tmp/multi/log.txt"
+	f, err := os.OpenFile(logFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("error opening file: %v", err)
+	}
+	defer f.Close()
+	log.SetOutput(f)
+
 	if len(os.Args) > 1 {
 		if os.Args[1] == "supports" {
 			os.Exit(0)
@@ -152,8 +85,10 @@ func main() {
 		}
 	}
 
-	//jsonText := readTextFile("/tmp/sample.json")
-	jsonText := readJsonFromStdIn()
+	jsonText := ReadTextFile("/tmp/multi/input.json")
+	// jsonText := readJsonFromStdIn()
+	//	CreateTextFile("/tmp/multi/input.json", jsonText)
+	log.Println("After readJsonFromStdIn()")
 
 	var book []MdBookTopItem
 	errJson := json.Unmarshal([]byte(jsonText), &book)
