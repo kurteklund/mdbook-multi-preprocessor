@@ -68,6 +68,15 @@ func readTextFile(filePath string) string {
 	return text
 }
 
+func GetConditionalRegions(topItem MdBookTopItem) []string {
+	var preprocessor = topItem.Config.Preprocessor
+	if preprocessor.Test != nil && preprocessor.Test.ConditionalRegions != nil {
+		return preprocessor.Test.ConditionalRegions
+	}
+
+	return []string{}
+}
+
 func main() {
 	const logFileName = "/tmp/multi/log.txt"
 	f, err := os.OpenFile(logFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
@@ -97,8 +106,9 @@ func main() {
 		// The input json is an slice with 2 items.
 		// The first item is configuration, parameters to the preprocessor and other stuff
 		// The second item is the "content" of the book, the part that should be exported
+		conditionalRegions := GetConditionalRegions(book[0])
 		bookSections := book[1]
-		processSections(&bookSections)
+		processSections(&bookSections, conditionalRegions)
 		// writeBookSectionsToFile(bookSections, "/tmp/mdbook_out.json")
 		writeBookSectionsStdOut(bookSections)
 	}
